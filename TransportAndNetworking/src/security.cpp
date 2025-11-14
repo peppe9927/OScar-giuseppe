@@ -284,8 +284,8 @@ Security::signatureCreation (const std::string& tbsData_hex, const std::string& 
 
     GNsignMaterial signMaterial;
 
-    std::vector<unsigned char> tbsData_bytes = hexStringToBytes (tbsData_hex);
-    std::vector<unsigned char> certificate_bytes = hexStringToBytes (certificate_hex);
+    std::vector<unsigned char> tbsData_bytes(tbsData_hex.begin(), tbsData_hex.end());
+    std::vector<unsigned char> certificate_bytes(certificate_hex.begin(), certificate_hex.end());
 
     unsigned char tbsData_hash[SHA256_DIGEST_LENGTH];
     computeSHA256 (tbsData_bytes, tbsData_hash);
@@ -357,8 +357,8 @@ Security::signatureVerification (const std::string& tbsData_hex, const std::stri
 {
 
     // Convert hex string to bytes
-    std::vector<unsigned char> tbsData_bytes = hexStringToBytes (tbsData_hex);
-    std::vector<unsigned char> certificate_bytes = hexStringToBytes (certificate_hex);
+    std::vector<unsigned char> tbsData_bytes(tbsData_hex.begin(), tbsData_hex.end());
+    std::vector<unsigned char> certificate_bytes(certificate_hex.begin(), certificate_hex.end());
 
     // Compute SHA-256 hash
     unsigned char tbsData_hash[SHA256_DIGEST_LENGTH];
@@ -694,7 +694,7 @@ Security::createSecurePacket (GNDataRequest_t dataRequest, bool &isCertificate)
         m_certificate = certHex;
 
         // generate the digest of the certificate, so calculate the hash of certificate and take only the last 8 bytes
-        std::vector<unsigned char> cer_bytes = hexStringToBytes(certHex);
+        std::vector<unsigned char> cer_bytes(certHex.begin(), certHex.end());
         unsigned char c_hash[SHA256_DIGEST_LENGTH];
         computeSHA256(cer_bytes, c_hash);
         m_digest.clear();

@@ -72,6 +72,7 @@ class ECManager {
         uint16_t crlSeries;
         uint32_t validityPeriod_start;
         long validityPeriod_duration;
+        bool validityPeriod_isYears = false;
         std::vector<GNpsidSsp> appPermissions;
         long symAlgEnc;
         GNecdsaNistP256 encPublicKey;

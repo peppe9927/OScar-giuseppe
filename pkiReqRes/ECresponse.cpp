@@ -719,7 +719,8 @@ ECResponse::GNcertificateDC ECResponse::getECResponse()
   asn1cpp::Seq<CertificateBase> certData_decoded;
   certData_decoded = asn1cpp::oer::decode(certContent, CertificateBase);
 
-  GNcertificateDC newCert;
+  GNcertificateDC newCert{};
+  newCert.tbs.validityPeriod_isYears = false;
   newCert.version = asn1cpp::getField(certData_decoded->version, long);
   newCert.type = asn1cpp::getField(certData_decoded->type, long);
   newCert.issuer = asn1cpp::getField(certData_decoded->issuer.choice.sha256AndDigest, std::string);
@@ -732,8 +733,14 @@ ECResponse::GNcertificateDC ECResponse::getECResponse()
   newCert.tbs.cracaId = asn1cpp::getField(certData_decoded->toBeSigned.cracaId, std::string);
   newCert.tbs.crlSeries = asn1cpp::getField(certData_decoded->toBeSigned.crlSeries, uint16_t);
   newCert.tbs.validityPeriod_start = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.start, uint32_t);
-  if (asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.present, Duration_PR) == Duration_PR_years)
+  auto eaDuration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.present, Duration_PR);
+  if (eaDuration == Duration_PR_years) {
         newCert.tbs.validityPeriod_duration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.choice.years, long);
+        newCert.tbs.validityPeriod_isYears = true;
+  } else if (eaDuration == Duration_PR_hours) {
+        newCert.tbs.validityPeriod_duration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.choice.hours, long);
+        newCert.tbs.validityPeriod_isYears = false;
+  }
   int size2 = asn1cpp::sequenceof::getSize(certData_decoded->toBeSigned.appPermissions);
   for (int j = 0; j < size2; j++)
   {
@@ -965,7 +972,8 @@ ECResponse::GNcertificateDC ECResponse::getECResponse()
     {
       auto res = asn1cpp::getSeq(etsiContent->choice.enrolmentResponse, InnerEcResponse, &getValue_ok);
 
-      response ECres;
+      response ECres{};
+      ECres.certificate.tbs.validityPeriod_isYears = false;
 
       ECres.requestHash = asn1cpp::getField(res->requestHash, std::string);
       ECres.response_code = asn1cpp::getField(res->responseCode, long);
@@ -992,9 +1000,26 @@ ECResponse::GNcertificateDC ECResponse::getECResponse()
       ECres.certificate.tbs.cracaId = asn1cpp::getField(certDecoded->toBeSigned.cracaId, std::string);
       ECres.certificate.tbs.crlSeries = asn1cpp::getField(certDecoded->toBeSigned.crlSeries, uint16_t);
       ECres.certificate.tbs.validityPeriod_start = asn1cpp::getField(certDecoded->toBeSigned.validityPeriod.start, uint32_t);
-      if (asn1cpp::getField(certDecoded->toBeSigned.validityPeriod.duration.present, Duration_PR) == Duration_PR_hours)
+      auto durationPresent = asn1cpp::getField(certDecoded->toBeSigned.validityPeriod.duration.present, Duration_PR);
+      if (durationPresent == Duration_PR_hours)
       {
         ECres.certificate.tbs.validityPeriod_duration = asn1cpp::getField(certDecoded->toBeSigned.validityPeriod.duration.choice.hours, long);
+        ECres.certificate.tbs.validityPeriod_isYears = false;
+        std::cout << "[DEBUG] EC validity duration (hours): "
+                  << ECres.certificate.tbs.validityPeriod_duration << std::endl;
+      }
+      else if (durationPresent == Duration_PR_years)
+      {
+        auto years = asn1cpp::getField(certDecoded->toBeSigned.validityPeriod.duration.choice.years, long);
+        ECres.certificate.tbs.validityPeriod_duration = years;
+        ECres.certificate.tbs.validityPeriod_isYears = true;
+        std::cout << "[DEBUG] EC validity duration is encoded in years: "
+                  << ECres.certificate.tbs.validityPeriod_duration << std::endl;
+      }
+      else
+      {
+        ECres.certificate.tbs.validityPeriod_isYears = false;
+        std::cout << "[DEBUG] EC validity duration encoding enum value: " << durationPresent << std::endl;
       }
       int size2 = asn1cpp::sequenceof::getSize(certDecoded->toBeSigned.appPermissions);
       for (int j = 0; j < size2; j++)

@@ -924,7 +924,8 @@ void ECManager::createRequest()
   asn1cpp::Seq<CertificateBase> certData_decoded;
   certData_decoded = asn1cpp::oer::decode(certContent, CertificateBase);
 
-  GNcertificateDC newCert;
+  GNcertificateDC newCert{};
+  newCert.tbs.validityPeriod_isYears = false;
   newCert.version = asn1cpp::getField(certData_decoded->version, long);
   newCert.type = asn1cpp::getField(certData_decoded->type, long);
   newCert.issuer = asn1cpp::getField(certData_decoded->issuer.choice.sha256AndDigest, std::string);
@@ -937,8 +938,14 @@ void ECManager::createRequest()
   newCert.tbs.cracaId = asn1cpp::getField(certData_decoded->toBeSigned.cracaId, std::string);
   newCert.tbs.crlSeries = asn1cpp::getField(certData_decoded->toBeSigned.crlSeries, uint16_t);
   newCert.tbs.validityPeriod_start = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.start, uint32_t);
-  if (asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.present, Duration_PR) == Duration_PR_hours)
+  auto requestDuration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.present, Duration_PR);
+  if (requestDuration == Duration_PR_hours) {
     newCert.tbs.validityPeriod_duration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.choice.hours, long);
+    newCert.tbs.validityPeriod_isYears = false;
+  } else if (requestDuration == Duration_PR_years) {
+    newCert.tbs.validityPeriod_duration = asn1cpp::getField(certData_decoded->toBeSigned.validityPeriod.duration.choice.years, long);
+    newCert.tbs.validityPeriod_isYears = true;
+  }
   int size2 = asn1cpp::sequenceof::getSize(certData_decoded->toBeSigned.appPermissions);
   for (int j = 0; j < size2; j++)
   {
@@ -1313,8 +1320,12 @@ bool ECManager::manageRequest() {
         }
 
         // conversion of duration in years to seconds
-        if (EC.tbs.validityPeriod_start <= getCurrentTimestamp32() &&
-            getCurrentTimestamp32() <= EC.tbs.validityPeriod_start + EC.tbs.validityPeriod_duration * 31557600) {
+        const uint64_t durationMultiplier = EC.tbs.validityPeriod_isYears ? 31557600ULL : 3600ULL;
+        const uint64_t validityEnd = static_cast<uint64_t>(EC.tbs.validityPeriod_start) +
+                                     static_cast<uint64_t>(EC.tbs.validityPeriod_duration) * durationMultiplier;
+        const uint64_t now = getCurrentTimestamp32();
+
+        if (EC.tbs.validityPeriod_start <= now && now <= validityEnd) {
             std::cout << "[INFO] EC is valid" << std::endl;
             return true;
         } else {
